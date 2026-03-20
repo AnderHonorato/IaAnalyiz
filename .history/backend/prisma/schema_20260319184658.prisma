@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Mudamos de sqlite para postgresql
+  url      = env("DATABASE_URL")
+}
+
+// === NOVO MODELO DE AUTENTICAÇÃO ===
+model Usuario {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  senha             String
+  nome              String
+  verificado        Boolean  @default(false)
+  codigoVerificacao String?  // Para validar o email
+  codigoRecuperacao String?  // Para esqueci a senha
+  createdAt         DateTime @default(now())
+}
+
+model Produto {
+  id          Int       @id @default(autoincrement())
+  sku         String    @unique
+  nome        String
+  preco       Float
+  pesoGramas  Int
+  eKit        Boolean   @default(false)
+  mlItemId    String?   // Ex: MLB123456789
+  itensDoKit  KitItem[] @relation("KitPai")
+  parteDeKits KitItem[] @relation("ItemFilho")
+}
+
+model KitItem {
+  id         Int     @id @default(autoincrement())
+  kitId      Int
+  produtoId  Int
+  quantidade Int
+  kit        Produto @relation("KitPai", fields: [kitId], references: [id])
+  produto    Produto @relation("ItemFilho", fields: [produtoId], references: [id])
+}
+
+model Divergencia {
+  id        Int      @id @default(autoincrement())
+  mlItemId  String
+  link      String
+  motivo    String
+  resolvido Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

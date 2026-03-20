@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                   Int           @id @default(autoincrement())
+  email                String        @unique
+  senha                String
+  nome                 String
+  avatar               String?
+  verificado           Boolean       @default(false)
+  codigoVerificacao    String?
+  codigoRecuperacao    String?
+  role                 String        @default("BLOQUEADO")
+  solicitouDesbloqueio Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  chatSessions         ChatSession[]
+}
+
+model ChatSession {
+  id        Int           @id @default(autoincrement())
+  titulo    String        @default("Nova conversa")
+  usuarioId Int
+  usuario   Usuario       @relation(fields: [usuarioId], references: [id])
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id          Int         @id @default(autoincrement())
+  sessionId   Int
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String      // 'user' | 'ia'
+  content     String      @db.Text
+  imageBase64 String?     @db.Text  // imagem enviada pelo usuário (base64)
+  imageDesc   String?     @db.Text  // descrição gerada pela IA da imagem
+  createdAt   DateTime    @default(now())
+}
+
+model Produto {
+  id          Int       @id @default(autoincrement())
+  sku         String    @unique
+  nome        String
+  preco       Float
+  pesoGramas  Int
+  eKit        Boolean   @default(false)
+  mlItemId    String?
+  plataforma  String    @default("Mercado Livre")
+  itensDoKit  KitItem[] @relation("KitPai")
+  parteDeKits KitItem[] @relation("ItemFilho")
+}
+
+model KitItem {
+  id         Int     @id @default(autoincrement())
+  kitId      Int
+  produtoId  Int
+  quantidade Int
+  kit        Produto @relation("KitPai", fields: [kitId], references: [id])
+  produto    Produto @relation("ItemFilho", fields: [produtoId], references: [id])
+}
+
+model Divergencia {
+  id         Int      @id @default(autoincrement())
+  mlItemId   String
+  link       String
+  motivo     String
+  resolvido  Boolean  @default(false)
+  plataforma String   @default("Mercado Livre")
+  createdAt  DateTime @default(now())
+}

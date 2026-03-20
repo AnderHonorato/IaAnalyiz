@@ -1,0 +1,20 @@
+:root {
+  --bg-color: #f5f5f5;
+  --term-bg: #1e1e1e;
+  --term-text: #00ff00;
+  --primary: #2962ff;
+}
+body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; }
+.container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-bottom: 10px; }
+.primary { background: var(--primary); font-size: 16px; }
+.secondary { background: #607d8b; }
+.terminal { background: var(--term-bg); color: #fff; padding: 15px; height: 250px; overflow-y: auto; font-family: monospace; border-radius: 4px; display: flex; flex-direction: column; }
+.log.info { color: #4fc3f7; } .log.warn { color: #ffeb3b; } .log.error { color: #f44336; } .log.success { color: var(--term-text); }
+.progress-container { background: #e0e0e0; border-radius: 4px; margin: 10px 0; height: 25px; }
+.progress-bar { background: var(--primary); height: 100%; border-radius: 4px; width: 0%; text-align: center; color: white; line-height: 25px; transition: width 0.3s; }
+.time-left { font-size: 14px; color: #666; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+th { background-color: #f1f1f1; }
+a.link-btn { text-decoration: none; color: var(--primary); font-weight: bold; }
