@@ -1,0 +1,66 @@
+Sistema de Validação de Anúncios e Gestão de Kits (Mercado Livre)
+1. Visão Geral do Projeto
+O objetivo deste projeto é desenvolver uma ferramenta de auditoria automatizada para vendedores do Mercado Livre. O sistema irá comparar em tempo real os dados logísticos (peso e dimensões) cadastrados internamente na empresa com os dados ativos nos anúncios da plataforma, identificando divergências que podem causar prejuízos no frete ou penalidades logísticas.
+
+2. Análise da API do Mercado Livre
+A implementação baseia-se na documentação oficial de desenvolvedores do Mercado Livre.
+
+Eficiência de Consulta: Para evitar o bloqueio por excesso de requisições (Rate Limit), o sistema utiliza a técnica de Multiget, que permite consultar até 20 anúncios em uma única chamada.
+
+Monitoramento Logístico: O sistema foca no endpoint de itens, extraindo as dimensões declaradas e o peso para comparação imediata com o banco de dados interno.
+
+3. Lógica de Implementação para Kits
+O maior desafio logístico para vendedores é a venda de "Kits" (conjuntos de produtos). O sistema será implementado com a seguinte inteligência:
+
+Composição Hierárquica: O usuário cadastra produtos individuais (com seus respectivos pesos e medidas) e, em seguida, define "Kits".
+
+Cálculo Automático: Ao validar um anúncio de Kit, o Bot não busca um valor fixo, mas sim a soma dinâmica de todos os componentes do kit. Se um Kit contém 3 itens de 500g, o sistema validará se o anúncio no Mercado Livre registra 1.5kg.
+
+Identificação de Divergências: Caso o peso total calculado pelo sistema divirja do peso registrado no anúncio, o item é marcado para revisão humana.
+
+4. Funcionamento do Bot (Varredura)
+Processamento em Fila: O robô percorre o catálogo de forma sequencial e organizada.
+
+Tratamento de Erros: Caso o Mercado Livre interrompa a conexão por segurança, o sistema entra em modo de espera (Cool-down) e retoma automaticamente da fila de onde parou, garantindo que nenhum item seja esquecido.
+
+Terminal de Monitoramento: O administrador visualiza o progresso em tempo real através de um painel que indica a porcentagem concluída e o tempo estimado para o fim da operação.
+
+5. Especificações de Desenvolvimento
+Linguagem de Programação: JavaScript (Node.js para o motor de processamento e React para a interface administrativa).
+
+Banco de Dados: SQLite (com tecnologia Prisma), garantindo integridade de dados e rapidez na instalação.
+
+Arquitetura: Divisão entre "Backend" (inteligência e segurança do token) e "Frontend" (interface visual do usuário).
+
+6. Prazo e Viabilidade (Desenvolvedor Solo)
+Considerando o desenvolvimento das rotas de integração, segurança da API, lógica de soma de kits e interface de terminal:
+
+Estimativa de Tempo: 5 a 8 dias úteis para entrega da versão funcional (MVP).
+
+Responsável: 01 Desenvolvedor Full-Stack.
+
+Resumo da Análise da API (Mercado Livre)
+Robustez e Viabilidade: A API é extremamente madura e fornece todos os dados necessários para a auditoria, especificamente através do endpoint /items, que expõe detalhes de preço, estoque e as dimensões de envio (shipping.dimensions).
+
+Gestão de Volume (Multiget): A documentação encoraja o uso de consultas em lote para otimizar a performance; o sistema foi projetado para utilizar essa função, consultando até 20 anúncios por vez, o que reduz drasticamente o consumo de banda e o risco de bloqueios.
+
+Desafio do Rate Limit: O Mercado Livre possui políticas rígidas de limite de requisições por segundo. A API responde com o erro HTTP 429 (Too Many Requests) se for sobrecarregada, por isso a estratégia de Backoff (tempo de espera inteligente) integrada ao código é vital para a continuidade da varredura sem interrupções manuais.
+
+Sincronização de Dados: A API permite extrair o peso em gramas diretamente da string de dimensões, o que possibilita a comparação matemática exata com o banco de dados interno (Prisma).
+
+Monitoramento e Logs: Como a API funciona de forma assíncrona, a integração com o painel visual (Terminal) via Server-Sent Events (SSE) garante que o usuário saiba exatamente qual item está sendo processado e o status da comunicação com o servidor do Mercado Livre em tempo real.
+
+Conclusão Técnica
+A API é perfeitamente adequada para o projeto, desde que as chamadas sejam feitas de forma organizada e respeitando os intervalos de segurança para evitar o banimento temporário do IP da empresa.
+
+
+
+
+
+
+executar:
+
+BACKEND:
+C:\ngrok.exe http 3000 
+
+npx prisma migrate dev --name add_pesquisa_historico

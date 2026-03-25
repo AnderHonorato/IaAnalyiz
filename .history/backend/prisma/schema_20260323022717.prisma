@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                   Int              @id @default(autoincrement())
+  email                String           @unique
+  senha                String
+  nome                 String
+  avatar               String?
+  verificado           Boolean          @default(false)
+  codigoVerificacao    String?
+  codigoRecuperacao    String?
+  role                 String           @default("BLOQUEADO")
+  solicitouDesbloqueio Boolean          @default(false)
+  tema                 String           @default("dark")
+  geminiAtivo          Boolean          @default(true)
+  exclusaoPendente     Boolean          @default(false)
+  exclusaoCodigoHash   String?
+  exclusaoSolicitadaEm DateTime?
+  createdAt            DateTime         @default(now())
+  pesquisasHistorico   PesquisaHistorico[]
+  chatSessions          ChatSession[]
+  produtos              Produto[]
+  divergencias          Divergencia[]
+  divergenciaHistorico  DivergenciaHistorico[]
+  mlToken               MlToken?
+  agendador             AgendadorConfig?
+  resumosIA             ResumoIA[]
+  precificacaoHistorico PrecificacaoHistorico[]
+  mlCategorias          MlCategoria[]
+  avisosML              AvisoML[]
+  sessoes               SessaoUsuario[]
+  notificacoesIA    ProativaNotificacao[]
+}
+
+model ChatSession {
+  id        Int           @id @default(autoincrement())
+  titulo    String        @default("Nova conversa")
+  usuarioId Int
+  usuario   Usuario       @relation(fields: [usuarioId], references: [id])
+  messages  ChatMessage[]
+  documentos  ChatDocument[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id          Int         @id @default(autoincrement())
+  sessionId   Int
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String
+  content     String      @db.Text
+  imageBase64 String?     @db.Text
+  imageDesc   String?     @db.Text
+  createdAt   DateTime    @default(now())
+}
+
+// Histórico de Arquivos e Versões de Código gerados pela IA
+model ChatDocument {
+  id           Int         @id @default(autoincrement())
+  sessionId    Int
+  session      ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  filename     String
+  tipo         String      // 'upload' ou 'gerado'
+  language     String?
+  content      String      @db.Text
+  versao       Int         @default(1)
+  createdAt    DateTime    @default(now())
+}
+
+model Produto {
+  id            Int       @id @default(autoincrement())
+  usuarioId     Int
+  usuario       Usuario   @relation(fields: [usuarioId], references: [id])
+  sku           String
+  nome          String
+  preco         Float     @default(0)
+  pesoGramas    Int       @default(0)
+  alturaCm      Float     @default(0)
+  larguraCm     Float     @default(0)
+  comprimentoCm Float     @default(0)
+  eKit          Boolean   @default(false)
+  mlItemId      String?
+  categoria     String?
+  plataforma    String    @default("Mercado Livre")
+  status        String    @default("active")
+  thumbnail     String?
+  descricao     String?   @db.Text 
+
+  // ── Ficha Técnica Completa ────────────────────────────────────
+  ean           String?   // Código EAN / GTIN do produto
+  marca         String?   // Marca/fabricante
+  modelo        String?   // Modelo/referência
+  condicao      String?   @default("Novo") // Novo | Usado | Recondicionado
+
+  itensDoKit    KitItem[] @relation("KitPai")
+  parteDeKits   KitItem[] @relation("ItemFilho")
+
+  @@unique([usuarioId, sku])
+}
+
+model KitItem {
+  id         Int     @id @default(autoincrement())
+  kitId      Int
+  produtoId  Int
+  quantidade Int
+  kit        Produto @relation("KitPai", fields: [kitId], references: [id])
+  produto    Produto @relation("ItemFilho", fields: [produtoId], references: [id])
+}
+
+model Divergencia {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id])
+  mlItemId   String
+  link       String
+  motivo     String
+  pesoMl     Int      @default(0)
+  pesoLocal  Int      @default(0)
+
+  // ── Status ampliado ──────────────────────────────────────────
+  // PENDENTE        → divergência detectada, aguardando ação
+  // PENDENTE_ENVIO  → usuário vai corrigir via API daqui
+  // REINCIDENTE     → foi corrigido mas voltou a divergir
+  // CORRIGIDO       → corrigido (manualmente ou via API)
+  // IGNORADO        → usuário optou por ignorar
+  status     String   @default("PENDENTE")
+  resolvido  Boolean  @default(false)
+
+  // ── Origem da correção ────────────────────────────────────────
+  corrigidoViaApi  Boolean  @default(false) // true = corrigido pela API deste sistema
+  corrigidoManual  Boolean  @default(false) // true = usuário confirmou que corrigiu no ML
+
+  plataforma String   @default("Mercado Livre")
+  titulo     String?
+  createdAt  DateTime @default(now())
+
+  historico  DivergenciaHistorico[]
+}
+
+// ── Histórico de alterações por divergência ────────────────────────────────
+// Registra cada ação: quem fez, quando, o que fez
+model DivergenciaHistorico {
+  id            Int         @id @default(autoincrement())
+  divergenciaId Int
+  divergencia   Divergencia @relation(fields: [divergenciaId], references: [id], onDelete: Cascade)
+  usuarioId     Int
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id])
+
+  acao          String      // ex: "CORRIGIDO_MANUAL", "CORRIGIDO_API", "IGNORADO", "REABERTO", "PENDENTE_ENVIO"
+  descricao     String      @db.Text  // texto descritivo da ação
+  detalhes      String?     @db.Text  // JSON com dados antes/depois (opcional)
+
+  createdAt     DateTime    @default(now())
+}
+
+// ── Avisos do ML (anúncios desativados por divergência logística) ──────────
+// O ML envia health issues quando detecta divergências de peso/dimensão
+// e pode desativar anúncios automaticamente
+model AvisoML {
+  id          Int      @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  mlItemId    String
+  titulo      String?
+  thumbnail   String?
+
+  // ── Tipo do aviso ──────────────────────────────────────────────
+  // DIMENSOES_INCORRETAS, PESO_INCORRETO, ANUNCIO_PAUSADO, OUTROS
+  tipoAviso   String   @default("DIMENSOES_INCORRETAS")
+  mensagem    String   @db.Text   // mensagem original do ML
+  severidade  String   @default("ALTO")  // ALTO | MEDIO | BAIXO
+
+  // ── Status do aviso ────────────────────────────────────────────
+  resolvido   Boolean  @default(false)
+  resolvidoEm DateTime?
+
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([usuarioId, mlItemId, tipoAviso])
+}
+
+model MlToken {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int      @unique
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id])
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    DateTime
+  mlUserId     String   @default("")
+  nickname     String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+model AgendadorConfig {
+  id              Int       @id @default(autoincrement())
+  usuarioId       Int       @unique
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id])
+  ativo           Boolean   @default(false)
+  intervalo       Int       @default(360)
+  ultimaExecucao  DateTime?
+  proximaExecucao DateTime?
+}
+
+model ResumoIA {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  conteudo  String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+model PrecificacaoHistorico {
+  id            Int      @id @default(autoincrement())
+  usuarioId     Int
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  mlItemId      String
+  preco         Float
+  quantidade    Int      @default(1)
+  titulo        String   @default("")
+  categoriaId   String   @default("")
+  atualizadoPor String?
+  criadoEm      DateTime @default(now())
+}
+
+model MlCategoria {
+  id          Int     @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  categoriaId String
+  nome        String
+
+  @@unique([usuarioId, categoriaId])
+}
+model SessaoUsuario {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  entradaEm DateTime @default(now())
+  saidaEm   DateTime?
+  ativo     Boolean  @default(true)
+  userAgent String?
+  ip        String?
+ 
+  @@index([usuarioId])
+  @@index([ativo])
+}
+
+// ── Conhecimento acumulado pela IA ────────────────────────────────
+// Cada "fato" que a IA aprende fica aqui com nível de confiança
+model IaConhecimento {
+  id           Int      @id @default(autoincrement())
+  categoria    String   // ex: "metricas_sistema", "logistica", "conversa_logistica"
+  chave        String   // identificador único do conhecimento
+  valor        String   @db.Text  // o conhecimento em si
+  confianca    Float    @default(0.5)  // 0.0 a 1.0
+  fonte        String   @default("sistema") // "gemini_validacao", "analise_autonoma", "conversa_usuario"
+  usos         Int      @default(0)   // quantas vezes foi usado
+  atualizadoEm DateTime @default(now())
+  createdAt    DateTime @default(now())
+  embedding    Float[]
+
+  @@unique([categoria, chave])
+  @@index([categoria])
+  @@index([confianca])
+}
+
+// ── Histórico de aprendizados por interação ───────────────────────
+// Cada vez que a IA responde, salva aqui se foi aprovada ou não
+model IaAprendizado {
+  id                 Int      @id @default(autoincrement())
+  pergunta           String   @db.Text
+  respostaTentativa  String   @db.Text  // o que a IA tentou responder
+  respostaFinal      String   @db.Text  // o que foi enviado ao usuário
+  aprovada           Boolean  // Gemini validou como correta?
+  confianca          Float    @default(0.5)
+  motivo             String?  // motivo da aprovação/reprovação
+  usuarioId          Int?     // qual usuário gerou essa interação
+  createdAt          DateTime @default(now())
+  embedding          Float[]
+
+  @@index([aprovada])
+  @@index([usuarioId])
+  @@index([createdAt])
+}
+
+// ── Terminal de estudos (log visível) ────────────────────────────
+// Tudo que a IA "pensa" ou "estuda" fica registrado aqui
+model IaEstudoTerminal {
+  id        Int      @id @default(autoincrement())
+  tipo      String   // "analise_sistema", "mentoria_gemini", "aprendizado_conversa"
+  resumo    String   @db.Text
+  detalhes  String?  @db.Text  // JSON com dados extras
+  createdAt DateTime @default(now())
+
+  @@index([tipo])
+  @@index([createdAt])
+}
+
+// ── Histórico de pesquisas de anúncios ML ─────────────────────────────────
+// Salvo automaticamente a cada pesquisa, com soft delete e arquivamento
+model PesquisaHistorico {
+  id          Int       @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+
+  mlbId       String    // ID do anúncio pesquisado
+  urlOriginal String    @db.Text  // URL original que o usuário colou
+  titulo      String?   // Título do anúncio (quando encontrado)
+  thumbnail   String?   // Imagem do produto
+  preco       Float?    // Preço no momento da pesquisa
+
+  dadosJson   String?   @db.Text  // JSON completo do resultado
+  erro        String?   @db.Text  // Mensagem de erro (quando falhou)
+  status      String    @default("concluido") // concluido | erro
+
+  arquivado   Boolean   @default(false)  // movido para arquivados
+  excluido    Boolean   @default(false)  // soft delete
+  excluidoEm DateTime?                   // data do soft delete
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([usuarioId, mlbId])
+  @@index([usuarioId])
+  @@index([arquivado])
+  @@index([excluido])
+}
+
+// Notificações proativas da IA — controla balloon, cooldown e "não encher o saco"
+model ProativaNotificacao {
+  id          Int       @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+
+  // Texto curtíssimo para o balão — máx 70 chars, tom de teaser
+  // Ex: "Achei 3 divergências ativas, quer saber?"
+  resumoBotao String    // máx 70 chars
+
+  // Insight completo para exibir no chat quando usuário abrir
+  fullInsight String    @db.Text
+
+  // Contexto que gerou o insight (para deduplicação)
+  contextoHash String   // hash MD5 do estado que gerou (evita repetir mesmo dado)
+
+  // Controle de exibição
+  exibidaBotao Boolean  @default(false)  // mostrada no balão
+  vistaNoChat  Boolean  @default(false)  // usuário abriu o chat e viu
+  vistaEm      DateTime?                  // timestamp de quando viu
+
+  createdAt    DateTime @default(now())
+
+  @@index([usuarioId, vistaNoChat])
+  @@index([usuarioId, createdAt])
+}
