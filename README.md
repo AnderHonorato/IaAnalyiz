@@ -22,3 +22,27 @@ Certifica-te de que tens o [Node.js](https://nodejs.org/) (ou a linguagem que es
 1. Abre o terminal e navega para a pasta do backend:
    ```bash
    cd backend
+
+   Instala as dependências:
+
+Bash
+npm install
+Cria um ficheiro .env baseado no modelo (se existir) e configura as tuas variáveis de ambiente locais.
+
+Inicia o servidor:
+
+Bash
+npm start
+Configuração do Frontend
+Abre um novo terminal e navega para a pasta do frontend:
+
+Bash
+cd frontend
+Instala as dependências:
+
+Bash
+npm install
+Inicia a aplicação:
+
+Bash
+npm start
